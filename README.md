@@ -73,11 +73,16 @@ make --version
 
 ### 2. .envの編集
 
-```shell
-# APP PEPPERの作成
-docker run --rm python:3.14-slim python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
+APP_PEPPERの作成
 
+```shell
+# Pythonを使える場合
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+# Macの場合
+openssl rand -base64 32 | tr '+/' '-_' | tr -d '='
+# Windowsの場合
+$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+```
 
 ```.env
 # .envファイル内
