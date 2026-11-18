@@ -53,7 +53,8 @@ flowchart LR
 
 MIT License。詳細は [LICENSE](LICENSE) を参照してください。
 
-## 環境構築ざっくり解説
+## 環境構築の解説
+※詳細に触れません
 
 このプロジェクトのルートで
 ```shell
@@ -61,7 +62,7 @@ docker version
 docker compose version
 make --version
 ```
-が問題なくできれば動作確認できるはず
+が問題なくできれば動作確認できるはずです。
 
 ## 最小限の動作確認
 
@@ -93,12 +94,12 @@ make up
 ### 4. 確認
 
 ブラウザで
-https://localhost:8443/newを開く
+https://localhost:8443/new を開く
 
-1. プロフィール作成をクリック
-2. 全体保存をクリックしてメモ帳等に貼り付け
-3. 保存したにチェックをつけて、続けるをクリック
-4. プロフィールを編集(公開するをクリックして、保存すると、ログイン無しでhttps://localhost:8443/profiles/<public_id>で参照できるが、public_idは、現時点では、DBにのみ存在[profilesテーブル内])
+1. 「プロフィール作成」をクリック
+2. 「全体保存」をクリックしてメモ帳等に貼り付け
+3. 「保存した」にチェックをつけて、「続ける」をクリック
+4. プロフィールを編集(公開するをクリックして、保存すると、ログイン無しでhttps://localhost:8443/profiles/<public_id> で参照できるが、public_idは、現時点では、DBにのみ存在[profilesテーブル内])
 
 例えば、
 
