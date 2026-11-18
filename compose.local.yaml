@@ -1,0 +1,94 @@
+# local専用の差分。使い方: docker compose -f compose.yaml -f compose.local.yaml ...（Makefile経由推奨）
+services:
+  app:
+    build:
+      context: .
+      target: runtime
+      args:
+        GIT_SHA: local
+    image: anon-profile-app:dev
+    # 開発用: ソースをread-onlyでマウントして再読込。workerは1のまま。
+    command: [ "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log", "--no-server-header", "--no-proxy-headers", "--reload", "--reload-dir", "/app/src" ]
+    volumes:
+      - app-data:/data
+      - ./src:/app/src:ro
+      - ./static:/app/static:ro
+      - ./migrations:/app/migrations:ro
+      - ./scripts:/app/scripts:ro
+
+  reverse-proxy:
+    ports:
+      - "127.0.0.1:${LOCAL_HTTPS_PORT:-8443}:443" # 開発PCからのみ接続可
+
+  # lint/test用。`--profile tools`を付けたときだけ動く（通常のupでは起動しない）。
+  test:
+    profiles: [ "tools" ]
+    build:
+      context: .
+      target: test
+    image: anon-profile-test:dev
+    environment:
+      ENV: test
+      PUBLIC_BASE_URL: https://testserver
+      PYTEST_ADDOPTS: "-o cache_dir=/tmp/pytest_cache -q"
+      RUFF_CACHE_DIR: /tmp/ruff_cache
+      PYRIGHT_PYTHON_IGNORE_WARNINGS: "1"
+    volumes:
+      - ./src:/app/src:ro
+      - ./static:/app/static:ro
+      - ./migrations:/app/migrations:ro
+      - ./scripts:/app/scripts:ro
+      - ./tests:/app/tests:ro
+      # 整合テスト（D-07-05）が design/ を repo 検査するため read-only で渡す。
+      - ./design:/app/design:ro
+      - ./Dockerfile:/app/Dockerfile:ro
+      - ./compose.yaml:/app/compose.yaml:ro
+      - ./compose.deploy.yaml:/app/compose.deploy.yaml:ro
+      - ./.gitattributes:/app/.gitattributes:ro
+      - ./.github:/app/.github:ro
+      - ./deploy:/app/deploy:ro
+      - ./pyproject.toml:/app/pyproject.toml:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ ALL ]
+    security_opt:
+      - no-new-privileges:true
+
+  # 整形・自動修正専用。testと同じイメージを流用し、ソースを書き込み可能でマウントする。
+  # 検証側（test）は:roのまま維持し、書き換えはこのfmtサービスだけに限定する。
+  fmt:
+    profiles: [ "tools" ]
+    image: anon-profile-test:dev
+    environment:
+      RUFF_CACHE_DIR: /tmp/ruff_cache
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - ./scripts:/app/scripts
+      - ./migrations:/app/migrations
+      - ./pyproject.toml:/app/pyproject.toml:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ ALL ]
+    security_opt:
+      - no-new-privileges:true
+
+  # 設計書の生成・差分チェック専用（D-04）。testイメージを流用し、design/ を読み DESIGN.md を書く。
+  # DESIGN.md は生成物なので書き込み可でマウントする（design/ は読み取り専用）。
+  design:
+    profiles: [ "tools" ]
+    image: anon-profile-test:dev
+    environment:
+      PYTHONPATH: /app
+    volumes:
+      - ./scripts:/app/scripts:ro
+      - ./design:/app/design:ro
+      - ./DESIGN.md:/app/DESIGN.md
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ ALL ]
+    security_opt:
+      - no-new-privileges:true

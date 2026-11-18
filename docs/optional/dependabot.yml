@@ -1,0 +1,13 @@
+# 公開アーカイブでは自動実行しない。利用する場合だけ .github/dependabot.yml にコピーする。
+version: 2
+updates:
+  # Actions のバージョンを定期的に更新するPRを作る（無料）。
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+  # Caddy の digest 固定を定期更新するPRを作る（design/16 §18「HSTS とイメージ固定」）。
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly

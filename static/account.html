@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>パスワード変更</title>
+<link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<main>
+<h1>パスワード変更</h1>
+<form id="change-password-form">
+<label for="current_password">現在のパスワード</label>
+<input id="current_password" name="current_password" type="password" autocomplete="current-password" required>
+<label for="new_password">新しいパスワード（12文字以上）</label>
+<input id="new_password" name="new_password" type="password" autocomplete="new-password" minlength="12" required>
+<button type="submit">変更する</button>
+</form>
+<p id="form-error" role="alert" hidden></p>
+</main>
+<script src="/static/js/csrf.js"></script>
+<script src="/static/js/secrets.js"></script>
+<script src="/static/js/auth-guard.js"></script>
+<script src="/static/js/account.js"></script>
+</body>
+</html>

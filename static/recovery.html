@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>リカバリーキーで回復</title>
+<link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<main>
+<h1>リカバリーキーで回復</h1>
+<form id="recovery-form">
+<label for="recovery_key">リカバリーキー</label>
+<input id="recovery_key" name="recovery_key" type="text" autocomplete="off" required>
+<label for="new_password">新しいパスワード（12文字以上）</label>
+<input id="new_password" name="new_password" type="password" autocomplete="new-password" minlength="12" required>
+<button type="submit">回復する</button>
+</form>
+<p id="form-error" role="alert" hidden></p>
+<p><a href="/login">ログインへ戻る</a></p>
+</main>
+<script src="/static/js/csrf.js"></script>
+<script src="/static/js/secrets.js"></script>
+<script src="/static/js/recovery.js"></script>
+</body>
+</html>

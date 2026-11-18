@@ -1,0 +1,11 @@
+[Unit]
+Description=Run anon-profile backup daily
+
+[Timer]
+# 03:10 JST 相当
+OnCalendar=*-*-* 18:10:00 UTC
+RandomizedDelaySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

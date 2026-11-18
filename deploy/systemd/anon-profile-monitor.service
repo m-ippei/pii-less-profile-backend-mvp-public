@@ -1,0 +1,10 @@
+[Unit]
+Description=anon-profile host checks (disk, journal, backup age, cert)
+After=docker.service
+
+[Service]
+Type=oneshot
+User=deploy
+WorkingDirectory=/opt/anon-profile
+ExecStart=/opt/anon-profile/deploy/monitor.sh
+TimeoutStartSec=3min

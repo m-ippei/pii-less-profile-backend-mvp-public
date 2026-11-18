@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>プロフィール編集</title>
+<link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<main>
+<h1>プロフィール編集</h1>
+<form id="profile-form">
+<label for="content">本文（6,000文字以内）</label>
+<textarea id="content" name="content" rows="12"></textarea>
+<label for="published"><input id="published" type="checkbox"> 公開する</label>
+<button type="submit">保存する</button>
+</form>
+<p id="form-error" role="alert" hidden></p>
+<p id="form-status" role="status" hidden></p>
+</main>
+<script src="/static/js/csrf.js"></script>
+<script src="/static/js/secrets.js"></script>
+<script src="/static/js/auth-guard.js"></script>
+<script src="/static/js/profile-editor.js"></script>
+</body>
+</html>

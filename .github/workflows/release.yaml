@@ -1,0 +1,81 @@
+# 手動実行で: make check → runtime イメージを build → GHCR へ push → digest を Summary に表示。
+# 配備するのは「tag」ではなく「digest」。staging で検証した digest をそのまま本番へ出す。
+# 公開アーカイブでは自動実行しない（GitHub Actions / GHCR のリソース消費を避ける）。
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_e2e:
+        description: "make e2e（Playwright）も実行する（重いので手動のみ）"
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # compose.yaml の必須変数（ENV / APP_PEPPER 等）を満たすため。値はダミーで、秘密ではない。
+      - run: cp .env.example .env
+      - run: make check
+      - name: e2e（任意）
+        if: ${{ inputs.run_e2e }}
+        run: make e2e
+
+  build:
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Image 名（GHCR は小文字のみ）
+        id: name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}-app" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: build & push（runtime ターゲット）
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime
+          push: true
+          provenance: false          # 単一マニフェストにする（digest を1つに保ち、掃除も単純にする）
+          tags: ${{ steps.name.outputs.image }}:sha-${{ github.sha }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+      - name: デプロイ用の参照を表示
+        env:
+          IMAGE: ${{ steps.name.outputs.image }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          {
+            echo "### Image"
+            echo '```'
+            echo "${IMAGE}@${DIGEST}"
+            echo '```'
+            echo "Actions → deploy → Run workflow の image に上記を指定（まず staging、検証後に同じ値で production）"
+          } >> "$GITHUB_STEP_SUMMARY"

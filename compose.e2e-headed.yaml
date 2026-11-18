@@ -1,0 +1,25 @@
+# E2E 目視確認モード（任意・D-05）。compose.yaml + compose.e2e.yaml の上に重ねて使う。
+#
+#   docker compose -p anon-profile-e2e --env-file deploy/e2e/e2e.env \
+#     -f compose.yaml -f compose.e2e.yaml -f compose.e2e-headed.yaml --profile e2e ...
+#
+# e2e サービスを上書きする（別サービスは作らない）。`make e2e` はこのファイルを重ねないため、
+# ポートを公開せず headless のまま動く。`read_only` / `tmpfs` / `cap_drop` / `no-new-privileges`
+# / `shm_size` / `init` は compose.e2e.yaml から継承する（緩めない）。
+services:
+  e2e:
+    build:
+      context: .
+      target: e2e-headed
+    image: anon-profile-e2e-headed:dev
+    environment:
+      HEADED_RESOLUTION: "1440x900x24"
+      # テスト開始までの待ち（秒）。noVNC を開いて「接続」する時間を稼ぐ。shell の
+      # 環境変数 `E2E_HEADED_START_DELAY` で上書きできる（0 で無効）。
+      E2E_HEADED_START_DELAY: ${E2E_HEADED_START_DELAY:-20}
+      # compose.e2e.yaml 側の値（-o cache_dir=...）に headed 用オプションを足した完全な値。
+      PYTEST_ADDOPTS: "-o cache_dir=/tmp/pytest_cache --headed --slowmo ${E2E_SLOWMO:-300}"
+      PWDEBUG: ${PWDEBUG:-}
+    ports:
+      # run では --service-ports が必要。127.0.0.1 に限定する（省略すると全インターフェースに開く）。
+      - "127.0.0.1:${E2E_VNC_PORT:-6080}:6080"

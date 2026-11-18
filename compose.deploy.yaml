@@ -1,0 +1,23 @@
+# staging / production 共通の VPS 用差分（compose.yaml に重ねる）。
+#   docker compose -f compose.yaml -f compose.deploy.yaml ...   ← 通常は deploy/deploy.sh 経由
+# compose.local.yaml は絶対に重ねない（--reload・ソースの bind mount・build が有効になる）。
+services:
+  app:
+    # 必ず digest 指定（ghcr.io/<owner>/<repo>-app@sha256:...）。deploy.sh が .env に書き込む。
+    image: ${APP_IMAGE:?APP_IMAGE is required (ghcr.io/...@sha256:... を指定)}
+    logging:
+      driver: journald
+      options:
+        tag: anon-profile-app          # journalctl -t anon-profile-app で絞り込める
+
+  reverse-proxy:
+    ports:
+      # IPv4 を明示。IPv6 を docker-proxy 経由で受けると、アプリが見るクライアントIPが
+      # すべて同一になり、IP単位のrate limitが全ユーザーで共有されてしまうため。
+      - "0.0.0.0:80:80"                # ACME(HTTP-01) と HTTPS への誘導
+      - "0.0.0.0:443:443"
+      - "0.0.0.0:443:443/udp"          # HTTP/3
+    logging:
+      driver: journald
+      options:
+        tag: anon-profile-proxy

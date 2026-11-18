@@ -1,0 +1,21 @@
+# local / staging / production 共通。差分は環境変数のみ。
+#   SITE_ADDRESS: localhost(自己署名/Caddy local CA) または 実ドメイン(自動ACME)
+#   HSTS_VALUE  : localは max-age=0、本番は max-age=31536000 等
+{
+	admin off
+}
+
+{$SITE_ADDRESS:localhost} {
+	# アクセスログは出さない（`log`ディレクティブを置かない。SECURITY §7.1）
+	request_body {
+		max_size 1MB
+	}
+
+	header {
+		Strict-Transport-Security "{$HSTS_VALUE:max-age=0}"
+		-Server
+	}
+
+	# キャッシュしない（SECURITY §5）。CaddyはデフォルトでレスポンスをキャッシュしないためHSTS以外は付与不要。
+	reverse_proxy app:8000
+}

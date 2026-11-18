@@ -1,0 +1,99 @@
+# 手動実行（Run workflow）。compose/Caddyfile/スクリプト一式を VPS へ同期し、deploy.sh を実行する。
+# production は「staging で稼働中の digest と同一」であることを要求する（skip_staging_check で例外可）。
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "デプロイ先"
+        type: choice
+        options: [staging, production]
+        required: true
+      image:
+        description: "ghcr.io/<owner>/<repo>-app@sha256:...（release の Summary に表示）"
+        required: true
+      ref:
+        description: "compose / deploy スクリプトを取得する git ref"
+        default: main
+      skip_staging_check:
+        description: "production: staging との digest 一致確認を省略（緊急時のみ）"
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-${{ inputs.target }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: 入力検証
+        env:
+          IMAGE: ${{ inputs.image }}
+        run: |
+          set -euo pipefail
+          prefix="ghcr.io/${GITHUB_REPOSITORY,,}-app@sha256:"
+          [[ "$IMAGE" == "$prefix"* ]] || { echo "::error::image はこのリポジトリのもの（${prefix}...）を指定してください"; exit 1; }
+          [[ "$IMAGE" =~ ^ghcr\.io/[a-z0-9._-]+/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$ ]] || { echo "::error::image の形式が不正です"; exit 1; }
+
+      - name: 同期 & デプロイ
+        env:
+          TARGET: ${{ inputs.target }}
+          IMAGE: ${{ inputs.image }}
+          SKIP_STAGING_CHECK: ${{ inputs.skip_staging_check }}
+          STAGING_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          STAGING_USER: ${{ secrets.STAGING_SSH_USER }}
+          STAGING_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          STAGING_KNOWN_HOSTS: ${{ secrets.STAGING_SSH_KNOWN_HOSTS }}
+          PROD_HOST: ${{ secrets.PROD_SSH_HOST }}
+          PROD_USER: ${{ secrets.PROD_SSH_USER }}
+          PROD_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$STAGING_KEY" > ~/.ssh/key_staging
+          printf '%s\n' "$STAGING_KNOWN_HOSTS" > ~/.ssh/known_hosts_staging
+          printf '%s\n' "$PROD_KEY" > ~/.ssh/key_production
+          printf '%s\n' "$PROD_KNOWN_HOSTS" > ~/.ssh/known_hosts_production
+
+          # ssh_to <staging|production> <command>
+          ssh_to() {
+            local env="$1"; shift
+            local host user
+            if [[ "$env" == "production" ]]; then host="$PROD_HOST"; user="$PROD_USER"; else host="$STAGING_HOST"; user="$STAGING_USER"; fi
+            ssh -i ~/.ssh/key_"$env" -o IdentitiesOnly=yes -o BatchMode=yes \
+                -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts_"$env" \
+                "$user@$host" "$@"
+          }
+
+          if [[ "$TARGET" == "production" && "$SKIP_STAGING_CHECK" != "true" ]]; then
+            staged="$(ssh_to staging '/opt/anon-profile/deploy/deploy.sh current')"
+            if [[ "$staged" != "$IMAGE" ]]; then
+              echo "::error::staging で稼働中の digest と一致しません（staging: ${staged}）。先に staging へ deploy して検証してください"
+              exit 1
+            fi
+          fi
+
+          tar czf - compose.yaml compose.deploy.yaml deploy/proxy deploy/*.sh deploy/*.example deploy/systemd deploy/host \
+            | ssh_to "$TARGET" 'mkdir -p /opt/anon-profile && tar xzf - -C /opt/anon-profile --no-same-owner && chmod +x /opt/anon-profile/deploy/*.sh'
+
+          ssh_to "$TARGET" "/opt/anon-profile/deploy/deploy.sh deploy '$IMAGE'"
+
+          {
+            echo "### deployed to ${TARGET}"
+            echo '```'
+            echo "$IMAGE"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

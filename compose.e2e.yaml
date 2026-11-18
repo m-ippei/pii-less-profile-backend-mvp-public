@@ -1,0 +1,74 @@
+# E2E(Playwright)専用の差分（D-02）。compose.yaml と組み合わせて使う（compose.local.yaml には重ねない）。
+#
+#   docker compose -p anon-profile-e2e --env-file deploy/e2e/e2e.env \
+#     -f compose.yaml -f compose.e2e.yaml --profile e2e ...
+#
+# 設計のポイント
+#   - project名を分ける(-p anon-profile-e2e)ので、named volume(app-data等)は開発用と完全に別物になる。
+#   - --env-file で .env を差し替えるので、開発用のpepper等がE2Eに混ざらない。
+#   - app の build をこのファイルで定義する（compose.local.yaml に重ねないため）。
+#   - ブラウザ(Chromium)はe2eコンテナ内。composeネットワーク内の https://reverse-proxy へ接続する。
+#   - PUBLIC_BASE_URL(= https://reverse-proxy) と、ブラウザが送る Origin は完全一致する（CSRF検証のため）。
+
+services:
+  app:
+    build:
+      context: .
+      target: runtime
+      args:
+        GIT_SHA: e2e
+    image: anon-profile-e2e-app:dev
+    # localの --reload を外す（E2Eの不安定要因）。workerは1のまま(D-24)。
+    command: ["uvicorn", "src.main:app",
+              "--host", "0.0.0.0", "--port", "8000", "--workers", "1",
+              "--no-access-log", "--no-server-header", "--no-proxy-headers",
+              "--timeout-graceful-shutdown", "25"]
+
+  reverse-proxy:
+    # SITE_ADDRESS=reverse-proxy(単一ラベル名)にはCaddyの自動HTTPSが内部CAを使わないため、
+    # E2E専用のCaddyfileで `tls internal` を明示する（アプリ本体のCaddyfileは変更しない）。
+    volumes:
+      - ./deploy/e2e/Caddyfile:/etc/caddy/Caddyfile:ro
+    # e2eコンテナが「Caddyの証明書発行完了後」に起動するよう、起動待ちを明示する。
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --no-check-certificate -O /dev/null https://reverse-proxy/healthz || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 2s
+
+  # ブラウザ側。`--profile e2e` を付けたときだけ動く。
+  e2e:
+    profiles: ["e2e"]
+    build:
+      context: .
+      target: e2e
+    image: anon-profile-e2e:dev
+    init: true                      # Chromiumの子プロセスのゾンビ回収
+    depends_on:
+      app:
+        condition: service_healthy
+      reverse-proxy:
+        condition: service_healthy
+    environment:
+      E2E_BASE_URL: ${PUBLIC_BASE_URL:?PUBLIC_BASE_URL is required}   # e2e.env の値 = https://reverse-proxy
+      HOME: /tmp                    # read_only下でもPlaywrightが一時ファイルを書けるように
+      PYTEST_ADDOPTS: "-o cache_dir=/tmp/pytest_cache"
+    volumes:
+      # ランナー（test 系イメージ）はコードを焼き込まないため、`tests/conftest.py` が import する
+      # `src.main` と、その import 時に作られる `StaticFiles` 用の `static` を read-only で渡す
+      # （compose.local.yaml の test と同じ。付けないと `ModuleNotFoundError: No module named 'src'`）。
+      - ./src:/app/src:ro
+      - ./static:/app/static:ro
+      - ./tests:/app/tests:ro
+      - ./pyproject.toml:/app/pyproject.toml:ro
+      # trace / screenshot の出力先。マウントポイント自体は削除できないため、pytest の --output は
+      # このサブディレクトリ（/app/out/e2e）にする（Dockerfile の CMD 参照）。
+      - ./test-results:/app/out
+    shm_size: 1gb                   # Chromiumの共有メモリ不足によるクラッシュ対策
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true

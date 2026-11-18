@@ -1,0 +1,28 @@
+[project]
+name = "anon-profile"
+version = "0.0.0"
+description = "Anonymous profile offer platform backend MVP"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "m-ippei" }]
+requires-python = ">=3.14"
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--ignore=tests/e2e"      # make test に E2E を混ぜない（testイメージにplaywrightは無い）
+
+[tool.pyright]
+pythonVersion = "3.14"
+typeCheckingMode = "standard"
+include = ["src", "tests", "scripts"]
+reportMissingImports = true
+reportUnusedImport = false   # Ruff(F401)に任せる
+# testイメージにplaywrightが無いため。型検査は make e2e-typecheck（任意）で行う
+exclude = ["tests/e2e"]

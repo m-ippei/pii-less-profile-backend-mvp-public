@@ -1,0 +1,14 @@
+[Unit]
+Description=anon-profile daily SQLite backup (age-encrypted, offsite)
+After=docker.service
+Requires=docker.service
+ConditionPathExists=/opt/anon-profile/ops.env
+
+[Service]
+Type=oneshot
+User=deploy
+WorkingDirectory=/opt/anon-profile
+ExecStart=/opt/anon-profile/deploy/backup.sh
+TimeoutStartSec=15min
+Nice=10
+IOSchedulingClass=idle

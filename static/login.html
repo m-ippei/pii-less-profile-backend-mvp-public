@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ログイン</title>
+<link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<main>
+<h1>ログイン</h1>
+<form id="login-form">
+<label for="login_id">ログインID</label>
+<input id="login_id" name="login_id" type="text" autocomplete="username" required>
+<label for="password">パスワード</label>
+<input id="password" name="password" type="password" autocomplete="current-password" required>
+<button type="submit">ログイン</button>
+</form>
+<p id="form-error" role="alert" hidden></p>
+<p><a href="/recovery">リカバリーキーで回復する</a></p>
+</main>
+<script src="/static/js/csrf.js"></script>
+<script src="/static/js/login.js"></script>
+</body>
+</html>

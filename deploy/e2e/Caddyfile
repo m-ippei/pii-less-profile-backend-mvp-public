@@ -1,0 +1,23 @@
+# E2E専用（D-02）。SITE_ADDRESS=reverse-proxy は単一ラベル名のため、Caddyの自動HTTPSは
+# 内部CAを使わず公開ACMEへ出てしまい失敗する。E2Eでは `tls internal` を明示してCaddy内蔵CAを使う。
+# アプリ本体の Caddyfile（deploy/proxy/Caddyfile）は変更しない。
+{
+	admin off
+}
+
+{$SITE_ADDRESS:reverse-proxy} {
+	tls internal
+
+	# アクセスログは出さない（`log`ディレクティブを置かない。SECURITY §7.1）
+	request_body {
+		max_size 1MB
+	}
+
+	header {
+		Strict-Transport-Security "{$HSTS_VALUE:max-age=0}"
+		-Server
+	}
+
+	# キャッシュしない（デフォルトでキャッシュしないためHSTS以外は付与不要）。
+	reverse_proxy app:8000
+}

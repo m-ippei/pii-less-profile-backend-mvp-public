@@ -1,0 +1,29 @@
+# 手動実行のみ。GHCR の古い Image バージョンを削除する（ストレージを節約したいとき用）。
+# 削除したバージョンへはロールバックできない。staging / production が使用中の digest は必ず残る件数にすること。
+# うまく動かない場合: Package の Settings → "Manage Actions access" でこのリポジトリに Admin を付与。
+name: cleanup-images
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep:
+        description: "残す最新バージョン数"
+        default: "20"
+
+permissions:
+  packages: write
+
+jobs:
+  prune:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: パッケージ名
+        id: n
+        run: |
+          repo="${GITHUB_REPOSITORY#*/}"
+          echo "name=${repo,,}-app" >> "$GITHUB_OUTPUT"
+      - uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ steps.n.outputs.name }}
+          package-type: container
+          min-versions-to-keep: ${{ inputs.keep }}

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run anon-profile monitor daily
+
+[Timer]
+# 07:30 JST 相当
+OnCalendar=*-*-* 22:30:00 UTC
+RandomizedDelaySec=3min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
